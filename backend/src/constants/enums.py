@@ -8,3 +8,10 @@ class JobStatus(str, Enum):
     running = 'running'
     completed = 'completed'
     failed = 'failed'
+class ReviewStatus(str, Enum):
+    pending = 'pending'
+    approved = 'approved'
+    withdrawn = 'withdrawn'
+class ApprovalBatchStatus(str, Enum):
+    active = 'active'
+    withdrawn = 'withdrawn'

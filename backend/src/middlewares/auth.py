@@ -14,6 +14,9 @@ def current_user(token: HTTPAuthorizationCredentials | None = Depends(bearer), d
 def can_write(user=Depends(current_user)):
     if user.role not in ('admin','analyst'): raise HTTPException(403, '观察员只有读取权限')
     return user
-def admin_only(user=Depends(current_user)):
+def can_review(user=Depends(current_user)):
+    """Review actions are open to business owners; self-approval is blocked in the service."""
     if user.role != 'admin': raise HTTPException(403, '需要业务负责人批准')
     return user
+# Backwards-compatible name used by existing call sites.
+admin_only = can_review

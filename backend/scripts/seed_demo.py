@@ -2,7 +2,7 @@ import time, json
 from sqlalchemy import select, func
 from src.config.database import Session
 from migrations.initial import migrate
-from src.models import User, Dataset, Job, Report, Delivery, Audit
+from src.models import User, Dataset, Job, ApprovalBatch, Report, Delivery, Audit
 from src.services.business import metadata, seed_records, analyze
 from src.services.reports import deliver
 from src.utils.security import hash_password
@@ -26,9 +26,13 @@ def seed():
             result=analyze(d.records,params)
             json.dumps(result,ensure_ascii=False,allow_nan=False)
             admin=db.scalar(select(User).where(User.role=='admin'))
-            j=Job(name='基线复核 · '+m['name'],dataset_id=d.id,params=params,status='completed',result=result,created_by=admin.id,created_at=time.time()-3600,finished_at=time.time()-3595,approved=True)
+            # 演示基线由观察员账号发起，负责人再批准：创建者不能批准自己的结论。
+            creator=db.scalar(select(User).where(User.role=='viewer'))
+            j=Job(name='基线复核 · '+m['name'],dataset_id=d.id,params=params,status='completed',result=result,created_by=creator.id,created_at=time.time()-3600,finished_at=time.time()-3595,approved=True,review_status='approved')
             db.add(j);db.flush()
-            r=Report(name='每日业务复核简报',job_id=j.id,destination='业务复核组 · 本地收件箱',interval_seconds=86400,next_run=time.time()+86400,enabled=True)
+            batch=ApprovalBatch(job_id=j.id,status='active',approved_by=admin.email,approved_by_name=admin.name,approved_at=j.finished_at,approve_note='演示基线批准')
+            db.add(batch);db.flush();j.approval_batch_id=batch.id
+            r=Report(name='每日业务复核简报',job_id=j.id,destination='业务复核组 · 本地收件箱',interval_seconds=86400,next_run=time.time()+86400,enabled=True,approval_batch_id=batch.id,lifecycle='active')
             db.add(r);db.flush();deliver(db,r)
             db.add(Audit(actor='seed',action='demo.baseline',detail={'dataset':d.id},at=time.time()))
         db.commit()
